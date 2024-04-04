@@ -1,0 +1,106 @@
+import processing.video.*;
+import processing.serial.*;
+import java.awt.Desktop;
+import java.io.File;
+import java.io.IOException;
+
+Serial myPort; // The serial port
+Capture cam;
+PImage img;
+boolean takingSelfie = false;
+int startTime;
+int prevSecond = -1; // To store the previous second
+
+void setup() 
+{
+  fullScreen();
+  //size(640, 480);
+  cam = new Capture(this, 640, 480);
+  cam.start();
+  println(Serial.list()[1]); // Print a list of available serial ports
+  myPort = new Serial(this, Serial.list()[1], 9600); // Use the first port in the list
+  myPort.bufferUntil('\n'); // Read from serial port until a newline is received
+}
+
+
+void serialEvent(Serial myPort) 
+{
+  String inString = myPort.readStringUntil('\n');
+
+  if (inString != null) {
+    inString = trim(inString); // Trim off any whitespace
+    if (inString.equals("1")) {
+      takeSelfie();
+    }
+  }
+}
+
+void takeSelfie() {
+  startTime = millis();
+  takingSelfie = true;
+  prevSecond = -1; // reset the previous second counter
+  displayCountdown(3); // Display initial countdown immediately
+}
+void draw() {
+  if (cam.available() == true) {
+    cam.read();
+  }
+  image(cam, 0, 0, width, height);
+
+  if (takingSelfie) {
+    int elapsed = millis() - startTime;
+    int currentSecond = 3 - (elapsed / 1000);
+
+    // Only update the countdown display if the second has changed
+    if (currentSecond != prevSecond) {
+      prevSecond = currentSecond;
+      // Update the countdown on screen
+      displayCountdown(currentSecond);
+    }
+
+    // When countdown finishes, take the selfie
+    if (elapsed >= 3000) { 
+      takingSelfie = false; // reset the selfie taking flag
+      img = cam.get();
+      String filename = "selfie.png";
+      img.save(filename);
+      println("Selfie captured! Saved as: " + filename);
+      println("Success! Selfie taken.");
+      // Open the folder where the image is saved and exit
+      openFolder(sketchPath());
+      exit();
+    }
+  }
+}
+
+void keyPressed() {
+  if (key == ' ') {
+    startTime = millis();
+    takingSelfie = true;
+    prevSecond = -1; // reset the previous second counter
+    // Start the countdown immediately
+    displayCountdown(3);
+  }
+}
+
+void openFolder(String path) {
+  if (Desktop.isDesktopSupported()) {
+    try {
+      Desktop.getDesktop().open(new File(path));
+    } catch (IOException e) {
+      println("The file path could not be opened. " + e.getMessage());
+    }
+  } else {
+    println("Desktop is not supported on this platform.");
+  }
+}
+
+void displayCountdown(int count) {
+  fill(0); // Set fill color to black for background rectangle
+  rectMode(CENTER);
+  rect(width / 2, height / 2, 100, 100); // Draw a large rectangle to cover old numbers
+  fill(255, 0, 0); // Set fill color to red for text
+  textSize(64); // Set text size
+  textAlign(CENTER, CENTER); // Align text to center
+  text(count, width / 2, height / 2); // Display the number
+}
